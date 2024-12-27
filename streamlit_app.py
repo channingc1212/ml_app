@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-import altair as alt
+import altair as alt # type: ignore  # Altair is a declarative statistical visualization library for Python, used to create interactive charts and plots
 import time
 import zipfile
 
@@ -12,6 +12,7 @@ import zipfile
 st.set_page_config(page_title='ML Model Building', page_icon='🤖')
 st.title('🤖 ML Model Building')
 
+# About this app detailed description
 with st.expander('About this app'):
   st.markdown('**What can this app do?**')
   st.info('This app allow users to build a machine learning (ML) model in an end-to-end workflow. Particularly, this encompasses data upload, data pre-processing, ML model building and post-model analysis.')
@@ -34,7 +35,7 @@ with st.expander('About this app'):
 
 # Sidebar for accepting input parameters
 with st.sidebar:
-    # Load data
+    # Data Loading Options
     st.header('1.1. Input data')
 
     st.markdown('**1. Use custom data**')
