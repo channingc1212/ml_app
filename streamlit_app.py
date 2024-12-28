@@ -7,52 +7,57 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import (mean_squared_error, r2_score, accuracy_score, 
                            precision_score, recall_score, f1_score, roc_auc_score, mean_absolute_error)
-import altair as alt
+import altair as alt # for visualization
 import time
 import zipfile
-import pickle
+import pickle # for model export
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.feature_selection import SelectKBest, f_regression, mutual_info_regression
 
 # Page config
 st.set_page_config(
-    page_title='ML AutoBuilder For Beginners',
+    page_title='ML AutoBuilder',
     page_icon='🤖',
     layout='wide'
 )
 
-# Session state initialization
+# Session state initialization, used to manage the workflow of the Streamlit app
+# set to false by default, ensures that the model is not processed until the user has uploaded and processed data
 if 'data_processed' not in st.session_state:
-    st.session_state.data_processed = False
+    st.session_state.data_processed = False # set to false by default
+# set to false by default, ensures that the model is not trained until the user has selected features and applied transformations
 if 'model_trained' not in st.session_state:
-    st.session_state.model_trained = False
+    st.session_state.model_trained = False 
+
 
 # Main title
 st.title('🤖 ML AutoBuilder For Beginners')
+st.markdown("Welcome to the ML AutoBuilder! This tool helps you build machine learning models effortlessly.")
 
 # Tabs for workflow
 tab1, tab2, tab3, tab4 = st.tabs([
     "1. Data Upload & Processing", 
     "2. Feature Engineering", 
     "3. Model Building", 
-    "4. Predictions"
+    "4. Model Predictions"
 ])
 
+# Helper function to correctly identify numeric, temporal, and categorical columns
 def get_numeric_categorical_columns(df):
     """Helper function to correctly identify numeric, temporal, and categorical columns"""
     # First try to convert potential datetime columns
-    temporal_cols = []
+    temporal_cols = [] # list to store temporal columns
     for col in df.columns:
         try:
-            if df[col].dtype == 'object':
-                pd.to_datetime(df[col], errors='raise')
-                temporal_cols.append(col)
+            if df[col].dtype == 'object': # if the column is of type object, try to convert it to datetime
+                pd.to_datetime(df[col], errors='raise') # if the conversion fails, the error will be raised
+                temporal_cols.append(col) # if the conversion is successful, add the column to the temporal_cols list
         except:
-            continue
+            continue # if the conversion fails, continue to the next column
     
     # Get numeric columns
-    numeric_cols = df.select_dtypes(include=['int16', 'int32', 'int64', 'float16', 'float32', 'float64']).columns
+    numeric_cols = df.select_dtypes(include=['int16', 'int32', 'int64', 'float16', 'float32', 'float64']).columns 
     
     # Get remaining columns as categorical (excluding temporal)
     categorical_cols = [col for col in df.select_dtypes(exclude=['int16', 'int32', 'int64', 'float16', 'float32', 'float64']).columns 
@@ -60,7 +65,7 @@ def get_numeric_categorical_columns(df):
     
     return list(numeric_cols), list(categorical_cols), list(temporal_cols)
 
-# Data Upload & Processing
+# Tab 1: Data Upload & Processing
 with tab1:
     st.header("Data Upload & Processing")
     
@@ -77,7 +82,7 @@ with tab1:
         
     with example_col:
         st.subheader("Use Example Data")
-        use_example = st.checkbox("Load example dataset")
+        use_example = st.button("Load example dataset")
         
     # Data loading logic
     if uploaded_file is not None:
