@@ -118,6 +118,63 @@ with tab1:
             options=st.session_state.df.columns
         )
         
+        # Target variable missing value check
+        target_missing = st.session_state.df[target_col].isna().sum()
+        if target_missing > 0:
+            st.warning(f"⚠️ Target variable '{target_col}' has {target_missing} missing values ({(target_missing/len(st.session_state.df)*100):.2f}% of total)")
+            
+            # Determine target variable type
+            is_numeric_target = np.issubdtype(st.session_state.df[target_col].dtype, np.number)
+            
+            if is_numeric_target:
+                target_impute_method = st.radio(
+                    "Choose imputation method for target variable",
+                    ["Drop rows with missing target", "Mean", "Median", "Zero"],
+                    help="Mean: Replace with column mean\n"
+                         "Median: Replace with column median\n"
+                         "Zero: Replace with 0\n"
+                         "Drop rows: Remove rows with missing target values"
+                )
+                
+                if target_impute_method == "Drop rows with missing target":
+                    st.session_state.df = st.session_state.df.dropna(subset=[target_col])
+                elif target_impute_method == "Mean":
+                    st.session_state.df[target_col] = st.session_state.df[target_col].fillna(
+                        st.session_state.df[target_col].mean()
+                    )
+                elif target_impute_method == "Median":
+                    st.session_state.df[target_col] = st.session_state.df[target_col].fillna(
+                        st.session_state.df[target_col].median()
+                    )
+                else:  # Zero
+                    st.session_state.df[target_col] = st.session_state.df[target_col].fillna(0)
+            else:
+                target_impute_method = st.radio(
+                    "Choose imputation method for target variable",
+                    ["Drop rows with missing target", "Mode", "Custom value"],
+                    help="Mode: Replace with most frequent value\n"
+                         "Custom value: Replace with specified value\n"
+                         "Drop rows: Remove rows with missing target values"
+                )
+                
+                if target_impute_method == "Drop rows with missing target":
+                    st.session_state.df = st.session_state.df.dropna(subset=[target_col])
+                elif target_impute_method == "Mode":
+                    st.session_state.df[target_col] = st.session_state.df[target_col].fillna(
+                        st.session_state.df[target_col].mode()[0]
+                    )
+                else:  # Custom value
+                    custom_target_value = st.text_input("Enter custom value for target variable")
+                    if custom_target_value:
+                        st.session_state.df[target_col] = st.session_state.df[target_col].fillna(custom_target_value)
+            
+            # Verify target imputation
+            remaining_missing = st.session_state.df[target_col].isna().sum()
+            if remaining_missing > 0:
+                st.error(f"Error: Still {remaining_missing} missing values in target variable after imputation!")
+            else:
+                st.success("Target variable missing values handled successfully!")
+        
         # Missing values handling
         st.subheader("Missing Values Treatment")
         # Check for both NaN and None values
@@ -422,8 +479,11 @@ with tab3:
         
         y = target_data
         
-        if st.button("Train Models"):
-            # Split the data
+        # Verify no missing values in target
+        if y.isna().sum() > 0:
+            st.error(f"Error: Target variable '{target_col}' still has {y.isna().sum()} missing values. Please handle missing values in the Data Processing tab.")
+        else:
+            # Proceed with model training...
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=test_size, random_state=random_state
             )
