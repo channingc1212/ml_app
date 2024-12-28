@@ -94,8 +94,10 @@ Build, train, and select the best-performing ML models based on user preferences
 #### 4.1 Model Selection
 
 1. Provide a list of supported ML models, including but not limited to:
-- **Regression Models:** Linear Regression, Ridge, Lasso
+- **Regression Models:** Linear Regression, Ridge, Lasso, Decision Trees, Random Forest, XGBoost
 - **Classification Models:** Logistic Regression, Decision Trees, Random Forest, XGBoost
+- **Time Series Models:** ARIMA, SARIMA, Random Forest
+- **Determine the type of ML problem (classification, regression, time series) based on the target variable.
 
 #### 4.2 Model Validation
 
