@@ -69,6 +69,9 @@ def get_numeric_categorical_columns(df):
 with tab1:
     st.header("Data Upload & Processing")
     
+    # Set maximum upload size to 10MB
+    # st.set_option('client.maxUploadSize', 10)  # 10MB limit
+    
     # Data upload section
     upload_col, example_col = st.columns(2)
     
