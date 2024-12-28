@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler, On
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import (mean_squared_error, r2_score, accuracy_score, 
-                           precision_score, recall_score, f1_score, roc_auc_score)
+                           precision_score, recall_score, f1_score, roc_auc_score, mean_absolute_error)
 import altair as alt
 import time
 import zipfile
@@ -278,9 +278,6 @@ with tab1:
                     else:
                         st.write(new_missing)
 
-# Display all current session state in your Streamlit app.
-st.write(st.session_state)
-
 # Feature Engineering
 with tab2:
     if 'df' not in st.session_state:
@@ -404,11 +401,28 @@ with tab2:
             
             # Proceed button
             if st.button("Proceed to Model Building"):
-                if 'scaled_numerical' in st.session_state or 'encoded_categorical' in st.session_state:
+                can_proceed = False
+                
+                # Check if we have any features to use
+                if numerical_columns:
+                    if scaling_method == "None":
+                        # Store original numerical features
+                        st.session_state.original_numerical = st.session_state.df[numerical_columns]
+                        can_proceed = True
+                    elif 'scaled_numerical' in st.session_state:
+                        can_proceed = True
+                
+                if 'encoded_categorical' in st.session_state:
+                    can_proceed = True
+                    
+                if temporal_columns:
+                    can_proceed = True
+                
+                if can_proceed:
                     st.session_state.data_processed = True
                     st.success("Feature engineering completed! You can now proceed to Model Building.")
                 else:
-                    st.warning("Please apply at least one transformation before proceeding.")
+                    st.warning("Please select features and apply transformations (or select 'None') before proceeding.")
 
 # Model Building
 with tab3:
@@ -458,9 +472,12 @@ with tab3:
         # Prepare feature matrix
         X = pd.DataFrame()
         
-        # Add scaled numerical features if they exist
-        if 'scaled_numerical' in st.session_state:
-            X = pd.concat([X, st.session_state.scaled_numerical], axis=1)
+        # Add numerical features (scaled or original)
+        if numerical_columns:
+            if scaling_method == "None" and 'original_numerical' in st.session_state:
+                X = pd.concat([X, st.session_state.original_numerical], axis=1)
+            elif 'scaled_numerical' in st.session_state:
+                X = pd.concat([X, st.session_state.scaled_numerical], axis=1)
         
         # Add encoded categorical features if they exist
         if 'encoded_categorical' in st.session_state:
@@ -488,6 +505,10 @@ with tab3:
                 X, y, test_size=test_size, random_state=random_state
             )
             
+            # Store train-test split in session state
+            st.session_state.X_test = X_test
+            st.session_state.y_test = y_test
+            
             # Dictionary to store results
             results = {}
             
@@ -513,7 +534,7 @@ with tab3:
                         results[model_name]["ROC-AUC"] = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
                 else:
                     results[model_name] = {
-                        "MAE": mean_squared_error(y_test, y_pred),
+                        "MAE": mean_absolute_error(y_test, y_pred),
                         "MSE": mean_squared_error(y_test, y_pred),
                         "RMSE": np.sqrt(mean_squared_error(y_test, y_pred)),
                         "R² Score": r2_score(y_test, y_pred)
@@ -556,3 +577,155 @@ with tab3:
                     sns.barplot(data=importance_df.head(10), x='Importance', y='Feature')
                     plt.title(f"Top 10 Feature Importance - {model_name}")
                     st.pyplot(fig)
+
+# Predictions
+with tab4:
+    if not st.session_state.model_trained:
+        st.warning("Please complete the Model Building step first.")
+    else:
+        st.header("Generate Predictions")
+        
+        # Model selection for prediction
+        available_models = [model_name for model_name in st.session_state.keys() 
+                           if model_name.startswith('model_') and 
+                           not model_name.endswith('results') and 
+                           model_name != 'model_trained']
+        
+        if not available_models:
+            st.error("No trained models found. Please train models in the Model Building tab.")
+        else:
+            # Clean up model names for display
+            model_names = [model_name.replace('model_', '') for model_name in available_models]
+            
+            selected_model = st.selectbox(
+                "Select model for predictions",
+                options=model_names
+            )
+            
+            # Prediction data input method
+            pred_data_method = st.radio(
+                "Choose prediction data input method",
+                ["Upload new data", "Use test set"]
+            )
+            
+            if pred_data_method == "Upload new data":
+                uploaded_pred_file = st.file_uploader(
+                    "Upload CSV file for predictions (max 10MB)",
+                    type=["csv"],
+                    help="Upload a CSV file with the same features used for training"
+                )
+                
+                if uploaded_pred_file is not None:
+                    try:
+                        pred_df = pd.read_csv(uploaded_pred_file)
+                        
+                        # Verify columns match training features
+                        required_features = X.columns.tolist()
+                        missing_features = [col for col in required_features 
+                                          if col not in pred_df.columns]
+                        
+                        if missing_features:
+                            st.error(f"Missing required features: {', '.join(missing_features)}")
+                        else:
+                            # Prepare features using the same preprocessing steps
+                            pred_X = pred_df[required_features].copy()
+                            
+                            # Make predictions
+                            model = st.session_state[f"model_{selected_model}"]
+                            predictions = model.predict(pred_X)
+                            
+                            # Create results DataFrame
+                            results_df = pred_df.copy()
+                            results_df['Predicted_Value'] = predictions
+                            
+                            # Display results
+                            st.subheader("Prediction Results")
+                            st.dataframe(results_df)
+                            
+                            # Download results
+                            csv = results_df.to_csv(index=False)
+                            st.download_button(
+                                label="Download Predictions as CSV",
+                                data=csv,
+                                file_name="predictions.csv",
+                                mime="text/csv"
+                            )
+                            
+                    except Exception as e:
+                        st.error(f"Error processing prediction data: {str(e)}")
+                
+            else:  # Use test set
+                if 'X_test' not in st.session_state:
+                    st.error("Test set not found. Please retrain the model.")
+                else:
+                    # Make predictions on test set
+                    model = st.session_state[f"model_{selected_model}"]
+                    test_predictions = model.predict(st.session_state.X_test)
+                    
+                    # Create results DataFrame
+                    test_results_df = pd.DataFrame({
+                        'Actual': st.session_state.y_test,
+                        'Predicted': test_predictions
+                    })
+                    
+                    # Display results
+                    st.subheader("Test Set Predictions")
+                    st.dataframe(test_results_df)
+                    
+                    # Plot actual vs predicted
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    if problem_type == "Regression":
+                        plt.scatter(st.session_state.y_test, test_predictions, alpha=0.5)
+                        plt.plot([st.session_state.y_test.min(), st.session_state.y_test.max()], [st.session_state.y_test.min(), st.session_state.y_test.max()], 'r--', lw=2)
+                        plt.xlabel("Actual Values")
+                        plt.ylabel("Predicted Values")
+                        plt.title("Actual vs Predicted Values")
+                    else:  # Classification
+                        from sklearn.metrics import confusion_matrix
+                        import seaborn as sns
+                        cm = confusion_matrix(st.session_state.y_test, test_predictions)
+                        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+                        plt.xlabel("Predicted")
+                        plt.ylabel("Actual")
+                        plt.title("Confusion Matrix")
+                    
+                    st.pyplot(fig)
+                    
+                    # Download results
+                    csv = test_results_df.to_csv(index=False)
+                    st.download_button(
+                        label="Download Test Set Predictions as CSV",
+                        data=csv,
+                        file_name="test_predictions.csv",
+                        mime="text/csv"
+                    )
+            
+            # Model Export
+            st.subheader("Export Model")
+            if st.button("Download Trained Model"):
+                model = st.session_state[f"model_{selected_model}"]
+                
+                # Save model and related information
+                model_info = {
+                    'model': model,
+                    'feature_columns': X.columns.tolist(),
+                    'problem_type': problem_type,
+                    'target_column': target_col,
+                    'scaler': st.session_state.get('scaler', None),
+                    'categorical_encoders': st.session_state.get('categorical_encoders', None)
+                }
+                
+                # Serialize model info
+                with open('model_info.pkl', 'wb') as f:
+                    pickle.dump(model_info, f)
+                
+                # Read the file for download
+                with open('model_info.pkl', 'rb') as f:
+                    model_bytes = f.read()
+                
+                st.download_button(
+                    label="Download Model Package",
+                    data=model_bytes,
+                    file_name=f"{selected_model.lower().replace(' ', '_')}_package.pkl",
+                    mime="application/octet-stream"
+                )
