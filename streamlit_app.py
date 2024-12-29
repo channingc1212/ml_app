@@ -208,7 +208,7 @@ with tab1:
             st.dataframe(missing_df)
             
             # Batch imputation strategy
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             
             with col1:
                 if numeric_cols:
@@ -233,9 +233,15 @@ with tab1:
                              "Drop rows: Remove rows with missing values"
                     )
             
+            with col3:
+                if temporal_cols:
+                    st.write("**Temporal Columns Strategy**")
+                    temporal_strategy = "Drop rows"
+                    st.info("Temporal columns will have rows with missing values dropped as it's hard to infer the missing dates.")
+            
             if categorical_cols and categorical_strategy == "Custom value":
                 custom_value = st.text_input("Enter custom value for categorical columns")
-
+    
             if st.button("Apply Imputation"):
                 df_imputed = st.session_state.df.copy()
                 
@@ -261,6 +267,11 @@ with tab1:
                         else:  # Drop rows
                             df_imputed = df_imputed.dropna(subset=[col])
                 
+                # Apply temporal strategy
+                if temporal_cols:
+                    # Since the strategy is to drop rows with missing temporal values
+                    df_imputed = df_imputed.dropna(subset=temporal_cols)
+                
                 # Update the session state with imputed data
                 st.session_state.df = df_imputed
                 
@@ -281,7 +292,8 @@ with tab1:
                     if len(new_missing) == 0:
                         st.write("No missing values remaining!")
                     else:
-                        st.write(new_missing)
+                        new_missing['Missing Percentage'] = new_missing['Missing Percentage'].apply(lambda x: f"{x}%")
+                        st.dataframe(new_missing)
 
 # Feature Engineering
 with tab2:
