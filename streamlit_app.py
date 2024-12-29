@@ -484,6 +484,7 @@ with tab3:
         # Train-Test Split Parameters
         st.subheader("Train-Test Split")
         test_size = st.slider("Test Size", 0.1, 0.4, 0.2, 0.05)
+        # ensure same random state is used for all models
         random_state = st.number_input("Random State", 0, 999, 42)
         
         # Prepare feature matrix
